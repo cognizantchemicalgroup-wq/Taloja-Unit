@@ -18,9 +18,9 @@ The two versions don't sync with each other. Use **Export backup / Import** to m
 - **Log a workout:** date, type, minutes, feeling (Easy / Good / Hard / Max effort), notes.
 - **Workout types:** Strength, Cardio, Run, HIIT, Yoga, Walk, Cycling, Sports, plus **+ Custom** types that are saved for next time.
 - **Day off:** switch the form to *Day off* and pick a reason (Rest, Sick, Travel, Busy, Injury). Days off keep your streak alive; only an unlogged day breaks it.
-- **Year grid:** 52 columns × 7 rows (each week starts Thursday). Blue = workout, orange = day off, grey = not logged, outlined = upcoming, thick border = today.
+- **Year calendar:** one row per week (W1–W52), read left to right Thursday → Wednesday. Blue = workout, orange = day off, pink = missed, outlined = upcoming, thick border = today. It opens scrolled to the current week.
 - **Recent list:** last 40 entries, newest first, with a two-tap delete (Delete → Confirm?).
-- **Light and dark theme:** follows the phone/browser setting.
+- **Day / Night theme:** a switch at the top (Auto, Day, Night). Auto follows the phone setting; your choice is remembered. In the app the status bar changes colour too.
 - **Backup (app only):** Export opens Android's share sheet (WhatsApp, Drive, Gmail…). Import merges a pasted backup without duplicating entries.
 
 ---
