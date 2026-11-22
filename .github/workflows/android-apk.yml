@@ -1,0 +1,35 @@
+name: Build Android APK
+
+on:
+  push:
+    paths:
+      - 'android-app/**'
+      - '.github/workflows/android-apk.yml'
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: android-app
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: android-actions/setup-android@v3
+
+      - name: Build APK
+        run: ./gradlew --no-daemon assembleRelease
+
+      - name: Rename APK
+        run: cp app/build/outputs/apk/release/app-release.apk 52-weeks.apk
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: 52-weeks-apk
+          path: android-app/52-weeks.apk
