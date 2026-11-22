@@ -106,6 +106,15 @@ input:focus-visible, select:focus-visible, button:focus-visible { outline: 2px s
 .cal .c.today { outline: 2.5px solid var(--fg); outline-offset: 1px }
 .cal .c em { position: absolute; bottom: 4px; font: normal 600 .55rem/1 var(--body); letter-spacing: .04em; text-transform: uppercase; opacity: .9 }
 @media (max-width: 420px) { .cal .c em { display: none } .att-pct { font-size: 3.2rem } }
+[hidden] { display: none !important }
+.month-nav > div { min-width: 0; text-align: center }
+.month-nav h3 { font-size: 1.25rem !important; white-space: nowrap }
+.cal .c.pick { cursor: pointer }
+.cal .c.pick:active { transform: scale(.94) }
+.cal .c.sel { box-shadow: 0 0 0 3px var(--accent-soft), inset 0 0 0 2px var(--accent) }
+.chip.remove { border-style: dashed; color: var(--danger); border-color: var(--danger) }
+.toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(18px + env(safe-area-inset-bottom, 0px)); z-index: 20; max-width: min(92vw, 460px); background: var(--fg); color: var(--bg); font-weight: 600; padding: 12px 18px; border-radius: 12px; box-shadow: 0 6px 24px rgba(0,0,0,.25); text-align: center }
+.toast.warn { background: var(--danger); color: #fff }
 .theme-seg button { padding: 6px 12px; font-size: .85rem }
 .toprow { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap }
 .seg { display: inline-flex; border: 1px solid var(--line); border-radius: 10px; padding: 3px; gap: 3px; background: var(--bg); justify-self: start }
@@ -161,7 +170,7 @@ body { margin: 0; -webkit-tap-highlight-color: transparent }
   <section>
     <h2>Log your day</h2>
     <div class="panel">
-      <form id="form">
+      <form id="form" novalidate>
         <div class="full seg" role="group" aria-label="Entry type">
           <button type="button" id="mWork" aria-pressed="true">Workout</button>
           <button type="button" id="mOff" aria-pressed="false">Day off</button>
@@ -202,6 +211,7 @@ body { margin: 0; -webkit-tap-highlight-color: transparent }
             <span><i style="background:var(--off)"></i>Day off <strong id="attOff">0</strong></span>
             <span><i style="background:var(--miss)"></i>Missed <strong id="attMiss">0</strong></span>
             <span>of <strong id="attTotal">0</strong> days so far</span>
+            <span>Tap a date to log it.</span>
           </div>
         </div>
       </div>
@@ -247,6 +257,7 @@ body { margin: 0; -webkit-tap-highlight-color: transparent }
   </section>
 </div>
 
+<div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
 <script>
 const START = new Date(2026, 10, 19); // 19 Nov 2026
 const TOTAL = 364;
@@ -366,6 +377,15 @@ function renderAttendance(days, offDays) {
     else if (offDays.has(key)) { c.classList.add("off"); tag = "Off"; mt++; }
     else if (k < ti) { c.classList.add("miss"); tag = "Miss"; mt++; }
     if (k === ti) c.classList.add("today");
+    if (k >= 0 && k < TOTAL && k <= ti) {
+      c.classList.add("pick"); c.setAttribute("role", "button"); c.tabIndex = 0;
+      if (key === $("fDate").value) c.classList.add("sel");
+      c.onclick = () => {
+        $("fDate").value = key; renderCountdown();
+        document.getElementById("form").scrollIntoView({ behavior: "smooth", block: "start" });
+        toast("Logging for " + fmt(key) + ". Choose Workout or Day off, then Save.");
+      };
+    }
     if (tag) { const em = document.createElement("em"); em.textContent = tag; c.appendChild(em); }
     c.title = x.toDateString() + (tag ? " · " + tag : "");
     cal.appendChild(c);
@@ -410,6 +430,16 @@ function renderChips() {
   add.type = "button"; add.className = "chip add"; add.textContent = "+ Custom";
   add.onclick = () => { $("customRow").hidden = false; $("fCustom").focus(); };
   box.appendChild(add);
+  if (customTypes.includes(selectedType)) {
+    const rm = document.createElement("button");
+    rm.type = "button"; rm.className = "chip remove"; rm.textContent = "Remove “" + selectedType + "”";
+    rm.onclick = async () => {
+      customTypes = customTypes.filter(x => x !== selectedType); selectedType = "Strength"; renderChips();
+      if (db) { try { await db.doc("config/types").set({ list: customTypes }); } catch {} }
+      toast("Custom type removed");
+    };
+    box.appendChild(rm);
+  }
 }
 
 function renderLog() {
@@ -440,6 +470,8 @@ function renderLog() {
 
 $("fDate").value = iso(today());
 $("fDate").min = iso(START);
+$("fDate").max = iso(today() < START ? START : today());
+$("fDate").addEventListener("change", () => renderCountdown());
 renderChips(); renderOffChips(); renderCountdown();
 $("mWork").onclick = () => setMode("workout");
 $("mOff").onclick = () => setMode("off");
@@ -455,10 +487,26 @@ $("saveCustom").onclick = async () => {
 };
 $("fCustom").addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); $("saveCustom").click(); } });
 
+let toastTimer = null;
+function toast(msg, warn) {
+  const el = $("toast"); el.textContent = msg; el.className = "toast" + (warn ? " warn" : ""); el.hidden = false;
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => { el.hidden = true; }, warn ? 4500 : 2600);
+  $("status").textContent = msg;
+}
 $("form").addEventListener("submit", async ev => {
   ev.preventDefault();
-  if (!db) { $("status").textContent = "Your log isn't connected, so this can't be saved yet."; return; }
-  const entry = { date: $("fDate").value, createdAt: new Date().toISOString() };
+  if (!db) { toast("Your log isn't connected yet, so this can't be saved.", true); return; }
+  const date = $("fDate").value;
+  if (!date) { toast("Pick a date first.", true); return; }
+  const k = dayIdx(parse(date));
+  if (k < 0 || k >= TOTAL) { toast("Pick a date between 19 Nov 2026 and 18 Nov 2027.", true); return; }
+  if (k > dayIdx(today())) { toast("That date is in the future. You can log today or earlier.", true); return; }
+  const sameDay = entries.filter(e => e.date === date);
+  if (mode === "off") {
+    if (sameDay.some(e => !isOff(e))) { toast(fmt(date) + " already has a workout. Delete it under Recent workouts first, or pick another date.", true); return; }
+    if (sameDay.some(isOff)) { toast(fmt(date) + " is already marked as a day off.", true); return; }
+  }
+  const entry = { date, createdAt: new Date().toISOString() };
   if (mode === "off") { entry.kind = "off"; entry.type = "Day off"; entry.reason = offReason; }
   else {
     entry.kind = "workout"; entry.type = selectedType;
@@ -469,9 +517,11 @@ $("form").addEventListener("submit", async ev => {
   $("submit").disabled = true;
   try {
     await db.collection("workouts").add(entry);
-    $("status").textContent = "Saved " + (mode === "off" ? "day off (" + offReason + ")" : entry.type) + " for " + fmt(entry.date) + ".";
+    // You trained after all: a workout replaces a day off on the same date.
+    if (mode === "workout") for (const e of sameDay.filter(isOff)) { try { await db.collection("workouts").doc(e.id).delete(); } catch {} }
+    toast("✓ Saved " + (mode === "off" ? "day off (" + offReason + ")" : entry.type) + " for " + fmt(date));
     $("fMin").value = ""; $("fNote").value = ""; $("fFeel").value = "";
-  } catch (e) { $("status").textContent = "Couldn't save: " + e.message; }
+  } catch (e) { toast("Couldn't save: " + e.message, true); }
   $("submit").disabled = false;
 });
 

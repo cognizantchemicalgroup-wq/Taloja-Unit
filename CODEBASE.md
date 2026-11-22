@@ -18,6 +18,9 @@ The two versions don't sync with each other. Use **Export backup / Import** to m
 - **Log a workout:** date, type, minutes, feeling (Easy / Good / Hard / Max effort), notes.
 - **Workout types:** Strength, Cardio, Run, HIIT, Yoga, Walk, Cycling, Sports, plus **+ Custom** types that are saved for next time.
 - **Day off:** switch the form to *Day off* and pick a reason (Rest, Sick, Travel, Busy, Injury). Days off keep your streak alive; only an unlogged day breaks it.
+- **Tap a date** in the Attendance calendar to log that day. Saving shows a confirmation pop-up.
+- **Clear rules:** a day off can't be saved on a day that already has a workout; a workout saved on a day off replaces it; future dates are blocked.
+- **Remove a custom type:** select it, then tap *Remove “…”*.
 - **Attendance:** big attendance % (present ÷ days so far), a present / day off / missed bar, and a month calendar with large date boxes (‹ › to change month, Nov 2026 – Nov 2027).
 - **Year calendar:** one row per week (W1–W52), read left to right Thursday → Wednesday. Blue = workout, orange = day off, pink = missed, outlined = upcoming, thick border = today. It opens scrolled to the current week.
 - **Recent list:** last 40 entries, newest first, with a two-tap delete (Delete → Confirm?).
