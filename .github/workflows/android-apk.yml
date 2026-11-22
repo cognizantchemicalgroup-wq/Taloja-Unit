@@ -10,6 +10,8 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     defaults:
       run:
         working-directory: android-app
@@ -31,3 +33,14 @@ jobs:
         with:
           name: 52-weeks-apk
           path: android-app/52-weeks.apk
+
+      - name: Save APK to the repo (apk/52-weeks.apk)
+        working-directory: .
+        run: |
+          mkdir -p apk
+          cp android-app/52-weeks.apk apk/52-weeks.apk
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add apk/52-weeks.apk
+          git commit -m "Update built APK" || echo "No change"
+          git push
