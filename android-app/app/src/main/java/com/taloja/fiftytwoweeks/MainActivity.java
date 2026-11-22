@@ -2,7 +2,10 @@ package com.taloja.fiftytwoweeks;
 
 import android.app.Activity;
 import android.content.Intent;
+import android.os.Build;
 import android.os.Bundle;
+import android.view.View;
+import android.view.Window;
 import android.webkit.JavascriptInterface;
 import android.webkit.WebResourceRequest;
 import android.webkit.WebSettings;
@@ -60,8 +63,28 @@ public class MainActivity extends Activity {
         else super.onBackPressed();
     }
 
-    /** Called from the page as window.Android.shareText(...) for backups. */
+    /** Colours the status and navigation bars to match the page's Day/Night theme. */
+    private void applyBars(boolean dark) {
+        Window w = getWindow();
+        int color = dark ? 0xFF0E1117 : 0xFFF3F5F8;
+        w.setStatusBarColor(color);
+        w.setNavigationBarColor(color);
+        webView.setBackgroundColor(color);
+        View decor = w.getDecorView();
+        int flags = decor.getSystemUiVisibility();
+        int light = View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR;
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) light |= View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR;
+        flags = dark ? (flags & ~light) : (flags | light);
+        decor.setSystemUiVisibility(flags);
+    }
+
+    /** Called from the page as window.Android.shareText(...) / setBars(...). */
     private class Bridge {
+        @JavascriptInterface
+        public void setBars(boolean dark) {
+            runOnUiThread(() -> applyBars(dark));
+        }
+
         @JavascriptInterface
         public void shareText(String text) {
             Intent send = new Intent(Intent.ACTION_SEND);
