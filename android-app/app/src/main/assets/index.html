@@ -82,6 +82,30 @@ input:focus-visible, select:focus-visible, button:focus-visible { outline: 2px s
 .wk i.off { background: var(--off); border-color: var(--off) }
 .wk i.miss { background: var(--miss); border-color: var(--miss) }
 .wk i.today { outline: 2px solid var(--fg); outline-offset: 1px }
+.att-top { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 18px; align-items: center }
+.att-pct { font-family: var(--display); font-weight: 800; font-size: 4rem; line-height: .9; color: var(--accent) }
+.att-pct small { display: block; font: 600 .72rem/1.3 var(--body); color: var(--muted); text-transform: uppercase; letter-spacing: .1em; margin-top: 6px }
+.att-bar { display: flex; height: 14px; border-radius: 7px; overflow: hidden; background: var(--future); border: 1px solid var(--line) }
+.att-bar b { display: block; height: 100% }
+.att-keys { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: .85rem; color: var(--muted); margin-top: 10px }
+.att-keys strong { color: var(--fg); font-variant-numeric: tabular-nums }
+.att-keys i { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 5px; vertical-align: 0 }
+.month-nav { display: flex; align-items: center; justify-content: space-between; gap: 8px }
+.month-nav h3 { margin: 0; font-family: var(--display); font-size: 1.5rem; font-weight: 700; text-transform: uppercase; letter-spacing: .02em }
+.month-nav .mstat { font-size: .82rem; color: var(--muted); text-align: center }
+.navbtn { font: inherit; font-size: 1.2rem; width: 40px; height: 40px; border-radius: 10px; border: 1px solid var(--line); background: var(--bg); color: var(--fg); cursor: pointer }
+.navbtn:disabled { opacity: .35; cursor: default }
+.cal { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 6px }
+.cal .dow { font: 600 .7rem/1 var(--body); color: var(--muted); text-align: center; text-transform: uppercase; letter-spacing: .06em; padding-bottom: 2px }
+.cal .c { aspect-ratio: 1; max-width: 100%; border-radius: 10px; border: 1px solid var(--line); background: var(--future); display: grid; place-items: center; position: relative; font: 600 1rem/1 var(--body); color: var(--fg); font-variant-numeric: tabular-nums }
+.cal .c.done { background: var(--done); border-color: var(--done); color: #fff }
+.cal .c.off { background: var(--off); border-color: var(--off); color: #fff }
+.cal .c.miss { background: var(--miss); border-color: var(--miss); color: var(--danger) }
+.cal .c.out { opacity: .3 }
+.cal .c.blank { visibility: hidden }
+.cal .c.today { outline: 2.5px solid var(--fg); outline-offset: 1px }
+.cal .c em { position: absolute; bottom: 4px; font: normal 600 .55rem/1 var(--body); letter-spacing: .04em; text-transform: uppercase; opacity: .9 }
+@media (max-width: 420px) { .cal .c em { display: none } .att-pct { font-size: 3.2rem } }
 .theme-seg button { padding: 6px 12px; font-size: .85rem }
 .toprow { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap }
 .seg { display: inline-flex; border: 1px solid var(--line); border-radius: 10px; padding: 3px; gap: 3px; background: var(--bg); justify-self: start }
@@ -163,6 +187,30 @@ body { margin: 0; -webkit-tap-highlight-color: transparent }
           <span class="status" id="status">Ready.</span>
         </div>
       </form>
+    </div>
+  </section>
+
+  <section>
+    <h2>Attendance</h2>
+    <div class="panel" style="display:grid;gap:18px">
+      <div class="att-top">
+        <div class="att-pct"><span id="attPct" class="num">–</span><small>Attendance</small></div>
+        <div>
+          <div class="att-bar" aria-hidden="true"><b id="attBarDone" style="background:var(--done)"></b><b id="attBarOff" style="background:var(--off)"></b><b id="attBarMiss" style="background:var(--miss)"></b></div>
+          <div class="att-keys">
+            <span><i style="background:var(--done)"></i>Present <strong id="attDone">0</strong></span>
+            <span><i style="background:var(--off)"></i>Day off <strong id="attOff">0</strong></span>
+            <span><i style="background:var(--miss)"></i>Missed <strong id="attMiss">0</strong></span>
+            <span>of <strong id="attTotal">0</strong> days so far</span>
+          </div>
+        </div>
+      </div>
+      <div class="month-nav">
+        <button type="button" class="navbtn" id="mPrev" aria-label="Previous month">‹</button>
+        <div><h3 id="mTitle">–</h3><div class="mstat" id="mStat"></div></div>
+        <button type="button" class="navbtn" id="mNext" aria-label="Next month">›</button>
+      </div>
+      <div class="cal" id="cal"></div>
     </div>
   </section>
 
@@ -257,6 +305,7 @@ function renderCountdown() {
   let wk = 0; const ws = (week - 1) * 7;
   for (let k = ws; k < ws + 7; k++) { const x = new Date(START); x.setDate(x.getDate() + k); if (days.has(iso(x))) wk++; }
   $("sWeek").textContent = wk + "/7";
+  renderAttendance(days, offDays);
 
   const heat = $("heat"); heat.textContent = "";
   const curWeek = Math.floor(dayIdx(t) / 7);
@@ -280,6 +329,51 @@ function renderCountdown() {
   }
   if (curRow && !heat.dataset.scrolled) { heat.dataset.scrolled = "1"; heat.scrollTop = Math.max(0, curRow.offsetTop - heat.offsetTop - 60); }
 }
+
+// ---- Attendance: summary + month calendar ----
+const END = new Date(START); END.setDate(END.getDate() + TOTAL - 1);
+let calMonth = null; // first day of the month on screen
+function renderAttendance(days, offDays) {
+  const t = today(), ti = dayIdx(t);
+  const upto = Math.min(TOTAL - 1, ti); // count days 0..upto, but today only if logged
+  let present = 0, off = 0, miss = 0;
+  for (let k = 0; k <= upto; k++) {
+    const x = new Date(START); x.setDate(x.getDate() + k); const key = iso(x);
+    if (days.has(key)) present++; else if (offDays.has(key)) off++; else if (k < ti) miss++;
+  }
+  const total = present + off + miss;
+  $("attPct").textContent = total ? Math.round(present / total * 100) + "%" : "–";
+  $("attDone").textContent = present; $("attOff").textContent = off; $("attMiss").textContent = miss; $("attTotal").textContent = total;
+  const w = n => total ? (n / total * 100) + "%" : "0";
+  $("attBarDone").style.width = w(present); $("attBarOff").style.width = w(off); $("attBarMiss").style.width = w(miss);
+
+  if (!calMonth) { const c = t < START ? START : t > END ? END : t; calMonth = new Date(c.getFullYear(), c.getMonth(), 1); }
+  const y = calMonth.getFullYear(), m = calMonth.getMonth();
+  $("mTitle").textContent = calMonth.toLocaleDateString(undefined, { month: "long", year: "numeric" });
+  $("mPrev").disabled = y === START.getFullYear() && m === START.getMonth();
+  $("mNext").disabled = y === END.getFullYear() && m === END.getMonth();
+  const cal = $("cal"); cal.textContent = "";
+  ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"].forEach(d => { const h = document.createElement("div"); h.className = "dow"; h.textContent = d; cal.appendChild(h); });
+  const lead = (new Date(y, m, 1).getDay() + 6) % 7, dim = new Date(y, m + 1, 0).getDate();
+  for (let b = 0; b < lead; b++) { const e = document.createElement("div"); e.className = "c blank"; cal.appendChild(e); }
+  let mp = 0, mt = 0;
+  for (let d = 1; d <= dim; d++) {
+    const x = new Date(y, m, d), key = iso(x), k = dayIdx(x);
+    const c = document.createElement("div"); c.className = "c"; c.textContent = d;
+    let tag = "";
+    if (k < 0 || k >= TOTAL) c.classList.add("out");
+    else if (days.has(key)) { c.classList.add("done"); tag = "Gym"; mp++; mt++; }
+    else if (offDays.has(key)) { c.classList.add("off"); tag = "Off"; mt++; }
+    else if (k < ti) { c.classList.add("miss"); tag = "Miss"; mt++; }
+    if (k === ti) c.classList.add("today");
+    if (tag) { const em = document.createElement("em"); em.textContent = tag; c.appendChild(em); }
+    c.title = x.toDateString() + (tag ? " · " + tag : "");
+    cal.appendChild(c);
+  }
+  $("mStat").textContent = mt ? mp + " of " + mt + " days present" : "Nothing logged yet";
+}
+$("mPrev").onclick = () => { calMonth = new Date(calMonth.getFullYear(), calMonth.getMonth() - 1, 1); renderCountdown(); };
+$("mNext").onclick = () => { calMonth = new Date(calMonth.getFullYear(), calMonth.getMonth() + 1, 1); renderCountdown(); };
 
 // ---- Day / Night theme ----
 const THEME_KEY = "w52.theme";
