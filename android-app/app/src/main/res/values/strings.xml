@@ -1,3 +1,4 @@
 <resources>
     <string name="app_name">52 Weeks</string>
+    <string name="widget_desc">This week, today\'s status, streak and attendance</string>
 </resources>

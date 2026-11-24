@@ -1,7 +1,10 @@
 package com.taloja.fiftytwoweeks;
 
+import android.Manifest;
 import android.app.Activity;
 import android.content.Intent;
+import android.content.SharedPreferences;
+import android.content.pm.PackageManager;
 import android.os.Build;
 import android.os.Bundle;
 import android.view.View;
@@ -44,6 +47,14 @@ public class MainActivity extends Activity {
             }
         });
 
+        // Ask once for notification permission (Android 13+) and book the daily reminder.
+        if (Build.VERSION.SDK_INT >= 33
+                && checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
+                && Store.prefs(this).getBoolean("remind", true)) {
+            requestPermissions(new String[]{Manifest.permission.POST_NOTIFICATIONS}, 7);
+        }
+        ReminderReceiver.schedule(this);
+
         if (savedInstanceState != null) {
             webView.restoreState(savedInstanceState);
         } else {
@@ -80,6 +91,47 @@ public class MainActivity extends Activity {
 
     /** Called from the page as window.Android.shareText(...) / setBars(...). */
     private class Bridge {
+        /** The page sends its logged dates; the widget and reminder read them. */
+        @JavascriptInterface
+        public void syncState(String json) {
+            Store.saveState(MainActivity.this, json);
+            WeekWidget.updateAll(MainActivity.this);
+        }
+
+        @JavascriptInterface
+        public String getReminder() {
+            SharedPreferences p = Store.prefs(MainActivity.this);
+            boolean allowed = ReminderReceiver.canNotify(MainActivity.this);
+            return "{\"on\":" + p.getBoolean("remind", true)
+                    + ",\"hour\":" + p.getInt("hour", 20)
+                    + ",\"minute\":" + p.getInt("minute", 0)
+                    + ",\"allowed\":" + allowed + "}";
+        }
+
+        @JavascriptInterface
+        public void setReminder(boolean on, int hour, int minute) {
+            Store.prefs(MainActivity.this).edit()
+                    .putBoolean("remind", on).putInt("hour", hour).putInt("minute", minute).apply();
+            ReminderReceiver.schedule(MainActivity.this);
+            if (on && Build.VERSION.SDK_INT >= 33
+                    && checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+                runOnUiThread(() -> requestPermissions(new String[]{Manifest.permission.POST_NOTIFICATIONS}, 7));
+            }
+        }
+
+        /** Shows the reminder right now so you can see how it looks. Returns false if notifications are blocked. */
+        @JavascriptInterface
+        public boolean testReminder() {
+            if (!ReminderReceiver.canNotify(MainActivity.this)) {
+                if (Build.VERSION.SDK_INT >= 33) {
+                    runOnUiThread(() -> requestPermissions(new String[]{Manifest.permission.POST_NOTIFICATIONS}, 7));
+                }
+                return false;
+            }
+            ReminderReceiver.show(MainActivity.this, Store.snapshot(MainActivity.this), true);
+            return true;
+        }
+
         @JavascriptInterface
         public void setBars(boolean dark) {
             runOnUiThread(() -> applyBars(dark));

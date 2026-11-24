@@ -243,6 +243,22 @@ body { margin: 0; -webkit-tap-highlight-color: transparent }
     <h2>Recent workouts</h2>
     <div class="panel"><ul class="log" id="log"><li class="empty" style="display:block">Your workouts will appear here. Log your first one above.</li></ul></div>
   </section>
+  <section id="remSec" hidden>
+    <h2>Reminder &amp; widget</h2>
+    <div class="panel" style="display:grid;gap:12px">
+      <label class="row" style="text-transform:none;letter-spacing:0;font-size:15px;color:var(--fg);font-weight:500;gap:10px;display:flex">
+        <input type="checkbox" id="remOn" style="width:22px;height:22px;flex:none">
+        Remind me if I haven't logged by
+        <input type="time" id="remTime" value="20:00" style="width:auto;flex:none">
+      </label>
+      <div class="row">
+        <button class="btn ghost" type="button" id="remTest">Send a test reminder</button>
+        <span class="status" id="remStatus"></span>
+      </div>
+      <p class="status" style="margin:0">Home-screen widget: long-press an empty spot on your home screen → <b>Widgets</b> → <b>52 Weeks</b>, then drag it on. It shows this week, today's status, streak and attendance, and opens the app when tapped.</p>
+    </div>
+  </section>
+
   <section>
     <h2>Backup</h2>
     <div class="panel backup" style="display:grid;gap:10px">
@@ -536,7 +552,15 @@ const SEED = [
 ];
 function load(k, d) { try { const v = localStorage.getItem(k); return v === null ? d : JSON.parse(v); } catch { return d; } }
 function save(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); return true; } catch { $("status").textContent = "Couldn't save on this phone (storage full or blocked)."; return false; } }
-function persist() { save(KEY_E, entries); renderLog(); renderCountdown(); }
+function syncNative() {
+  try {
+    if (window.Android && Android.syncState) Android.syncState(JSON.stringify({
+      workout: [...new Set(entries.filter(e => !isOff(e)).map(e => e.date))],
+      off: [...new Set(entries.filter(isOff).map(e => e.date))]
+    }));
+  } catch {}
+}
+function persist() { save(KEY_E, entries); renderLog(); renderCountdown(); syncNative(); }
 entries = load(KEY_E, null);
 if (!Array.isArray(entries)) { entries = SEED.slice(); save(KEY_E, entries); }
 customTypes = load(KEY_T, []); if (!Array.isArray(customTypes)) customTypes = [];
@@ -547,7 +571,38 @@ db = {
   }),
   doc: () => ({ set: async v => { save(KEY_T, v.list); } })
 };
-renderChips(); renderLog(); renderCountdown();
+renderChips(); renderLog(); renderCountdown(); syncNative();
+
+// ---- Reminder settings (Android app only) ----
+if (window.Android && Android.getReminder) {
+  $("remSec").hidden = false;
+  const fmtTime = (h, m) => new Date(2000, 0, 1, h, m).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+  const showRem = () => {
+    try {
+      const r = JSON.parse(Android.getReminder());
+      $("remOn").checked = r.on;
+      $("remTime").value = String(r.hour).padStart(2, "0") + ":" + String(r.minute).padStart(2, "0");
+      $("remStatus").textContent = !r.on ? "Reminder is off."
+        : r.allowed ? "On: checks every day at " + fmtTime(r.hour, r.minute) + "."
+        : "Notifications are blocked. Allow them for 52 Weeks in your phone's Settings → Apps → 52 Weeks → Notifications.";
+    } catch {}
+  };
+  const saveRem = () => {
+    const [h, m] = ($("remTime").value || "20:00").split(":").map(Number);
+    try { Android.setReminder($("remOn").checked, h, m); } catch {}
+    toast($("remOn").checked ? "Reminder set for " + fmtTime(h, m) : "Reminder turned off");
+    setTimeout(showRem, 600);
+  };
+  $("remOn").addEventListener("change", saveRem);
+  $("remTime").addEventListener("change", saveRem);
+  $("remTest").onclick = () => {
+    let shown = false; try { shown = Android.testReminder(); } catch {}
+    toast(shown ? "Test reminder sent. Check your notifications." : "Notifications are blocked. Allow them, then try again.", !shown);
+    setTimeout(showRem, 1500);
+  };
+  document.addEventListener("visibilitychange", () => { if (!document.hidden) { showRem(); renderCountdown(); } });
+  showRem();
+}
 
 $("exportBtn").onclick = async () => {
   const text = JSON.stringify({ app: "52weeks", version: 1, exportedAt: new Date().toISOString(), entries, customTypes });

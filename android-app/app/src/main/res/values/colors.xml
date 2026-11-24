@@ -1,4 +1,13 @@
 <resources>
     <color name="bg">#F3F5F8</color>
     <color name="icon_bg">#2449E6</color>
+    <!-- widget -->
+    <color name="w_bg">#FFFFFF</color>
+    <color name="w_fg">#141821</color>
+    <color name="w_muted">#5D6676</color>
+    <color name="w_line">#C9D0DB</color>
+    <color name="w_done">#2449E6</color>
+    <color name="w_off">#D98A1C</color>
+    <color name="w_miss">#E9B8B8</color>
+    <color name="w_bad">#C22C2C</color>
 </resources>

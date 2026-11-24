@@ -25,6 +25,8 @@ The two versions don't sync with each other. Use **Export backup / Import** to m
 - **Year calendar:** one row per week (W1–W52), read left to right Thursday → Wednesday. Blue = workout, orange = day off, pink = missed, outlined = upcoming, thick border = today. It opens scrolled to the current week.
 - **Recent list:** last 40 entries, newest first, with a two-tap delete (Delete → Confirm?).
 - **Day / Night theme:** a switch at the top (Auto, Day, Night). Auto follows the phone setting; your choice is remembered. In the app the status bar changes colour too.
+- **Daily reminder (app only):** a notification at a time you choose (default 8 PM) that fires only if today has no workout or day off logged. Set it under *Reminder & widget*; *Send a test reminder* shows one immediately. Survives phone restarts.
+- **Home-screen widget (app only):** this week's 7 days as dots (Thu→Wed), today's status, streak, attendance and days left. Tap it to open the app.
 - **Backup (app only):** Export opens Android's share sheet (WhatsApp, Drive, Gmail…). Import merges a pasted backup without duplicating entries.
 
 ---
@@ -43,7 +45,13 @@ android-app/
     build.gradle                    ← app id com.taloja.fiftytwoweeks, minSdk 24, targetSdk 34
     src/main/
       AndroidManifest.xml
-      java/com/taloja/fiftytwoweeks/MainActivity.java   ← full-screen WebView + share bridge
+      java/com/taloja/fiftytwoweeks/
+        MainActivity.java           ← full-screen WebView + JS bridge (share, theme bars, sync, reminder)
+        Store.java                  ← native copy of logged dates; works out week, streak, attendance
+        ReminderReceiver.java       ← daily alarm → "You haven't logged today" notification
+        BootReceiver.java           ← re-books the reminder after restart / update
+        WeekWidget.java             ← home-screen widget
+      res/layout/widget.xml, res/xml/widget_info.xml  ← widget layout and settings
       assets/index.html             ← the tracker UI (offline version)
       res/                          ← app name, themes (light/dark), launcher icon (dumbbell)
 .github/workflows/android-apk.yml   ← builds the APK on GitHub
@@ -88,6 +96,8 @@ Uses the claude.ai artifact `db` capability. The access rule `{path: "", read: "
 `index.html` swaps the cloud database for a small local shim (`db` object) backed by `localStorage`:
 - `w52.entries`: the array of entries (seeded with your first entries from 19–22 Nov on first launch)
 - `w52.types`: custom workout types
+
+Whenever the log changes, the page calls `Android.syncState()` with the workout and day-off dates. `Store.java` saves them in SharedPreferences so the widget and reminder work even when the app is closed.
 
 `MainActivity.java` loads `file:///android_asset/index.html` in a WebView with JavaScript and DOM storage enabled. It exposes `window.Android.shareText(text)` so the page's **Export backup** button can open the Android share sheet. Links to other sites open in the phone's browser.
 
